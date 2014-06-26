@@ -71,6 +71,9 @@ struct Xprivate {
 	uint		putsnarf;
 	uint		assertsnarf;
 	int		destroyed;
+	XIM		xim;
+	XIC		xic;
+	long		xim_event_mask;
 };
 
 extern Xprivate _x;

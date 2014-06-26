@@ -368,6 +368,15 @@ _xattach(char *label, char *winsize)
 	 * Put the window on the screen, check to see what size we actually got.
 	 */
 	XMapWindow(_x.display, _x.drawable);
+
+	/*
+	 * Setup Input Method
+	 */	
+	_x.xim = XOpenIM(_x.display, NULL, NULL, NULL);
+	_x.xic = XCreateIC(_x.xim, XNInputStyle, XIMPreeditNothing | XIMStatusNothing, XNClientWindow, _x.drawable, NULL);
+	XGetICValues(_x.xic, XNFilterEvents, &(_x.xim_event_mask), NULL);
+	XSetICFocus(_x.xic);
+
 	XSync(_x.display, False);
 
 	if(!XGetWindowAttributes(_x.display, _x.drawable, &wattr))

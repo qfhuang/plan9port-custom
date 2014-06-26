@@ -120,6 +120,7 @@ main(int argc, char **argv)
 	Wsysmsg m;
 	XEvent event;
 
+	setlocale(LC_ALL, "");
 	/*
 	 * Move the protocol off stdin/stdout so that
 	 * any inadvertent prints don't screw things up.
@@ -143,7 +144,7 @@ main(int argc, char **argv)
 	default:
 		usage();
 	}ARGEND
-
+	
 	/*
 	 * Ignore arguments.  They're only for good ps -a listings.
 	 */
@@ -180,7 +181,7 @@ main(int argc, char **argv)
 		if(_x.fd >= 0){
 			if(firstx){
 				firstx = 0;
-				XSelectInput(_x.display, _x.drawable, Mask);
+				XSelectInput(_x.display, _x.drawable, Mask | _x.xim_event_mask);
 			}
 			FD_SET(_x.fd, &rd);
 			FD_SET(_x.fd, &xx);
@@ -241,6 +242,14 @@ main(int argc, char **argv)
 		}
 		{
 			/*
+			 * Setup Input Method
+			 */	
+			/* _x.xim = XOpenIM(_x.display, NULL, NULL, NULL);
+			_x.xic = XCreateIC(_x.xim, XNInputStyle, XIMPreeditNothing | XIMStatusNothing, XNClientWindow, _x.drawable, NULL);
+			XGetICValues(_x.xic, XNFilterEvents, &(_x.xim_event_mask), NULL);
+			XSetICFocus(_x.xic);
+*/	
+			/*
 			 * Read an X message if we can.
 			 * (XPending actually calls select to make sure
 			 * the display's fd is readable and then reads
@@ -249,6 +258,8 @@ main(int argc, char **argv)
 			 */
 			while(XPending(_x.display)){
 				XNextEvent(_x.display, &event);
+				if(XFilterEvent(&event, None))
+                        continue;
 				runxevent(&event);
 			}
 		}
@@ -496,6 +507,10 @@ runxevent(XEvent *xev)
 	static Mouse m;
 	XButtonEvent *be;
 	XKeyEvent *ke;
+	int kbuf_len = 10;
+	wchar_t *kbuf = (wchar_t *) malloc(kbuf_len * sizeof(wchar_t));
+	int klen;
+	Status status;
 
 #ifdef SHOWEVENT
 	static int first = 1;
@@ -555,67 +570,95 @@ runxevent(XEvent *xev)
 	case KeyRelease:
 	case KeyPress:
 		ke = (XKeyEvent*)xev;
-		XLookupString(ke, NULL, 0, &k, NULL);
-		c = ke->state;
-		switch(k) {
-		case XK_Alt_L:
-		case XK_Meta_L:	/* Shift Alt on PCs */
-		case XK_Alt_R:
-		case XK_Meta_R:	/* Shift Alt on PCs */
-		case XK_Multi_key:
-			if(xev->type == KeyPress)
-				altdown = 1;
-			else if(altdown) {
-				altdown = 0;
-				sendalt();
-			}
-			break;
-		}
-
-		switch(k) {
-		case XK_Control_L:
-			if(xev->type == KeyPress)
-				c |= ControlMask;
-			else
-				c &= ~ControlMask;
-			goto kbutton;
-		case XK_Alt_L:
-		case XK_Shift_L:
-			if(xev->type == KeyPress)
-				c |= Mod1Mask;
-			else
-				c &= ~Mod1Mask;
-		kbutton:
-			kstate = c;
-			if(m.buttons || kbuttons) {
-				altdown = 0; // used alt
-				kbuttons = 0;
-				if(c & ControlMask)
-					kbuttons |= 2;
-				if(c & Mod1Mask)
-					kbuttons |= 4;
-				sendmouse(m);
-				break;
-			}
-		}
-
 		if(xev->type != KeyPress)
 			break;
-		if(k == XK_F11){
-			fullscreen = !fullscreen;
-			_xmovewindow(fullscreen ? screenrect : windowrect);
-			return;
+		klen = XwcLookupString(_x.xic, ke, kbuf, kbuf_len, &k, &status);
+		/*fprintf(stderr, "klen:%d\t kbuf:%ls\t keysym:%04x\t status:%4x\t\n", klen, kbuf, k, status); */
+		if (status == XBufferOverflow) {
+			kbuf_len = klen;
+			kbuf = (wchar_t *)realloc((char *)kbuf,
+					kbuf_len * sizeof(wchar_t));
+			klen = XwcLookupString(_x.xic, ke, kbuf, kbuf_len, &k, &status);
+		} 
+
+		switch(status) {
+		case XLookupNone:
+			break;
+		case XLookupChars:
+			if(kbd.stall)
+				return;
+			int i;
+			for(i = 0; i < klen; i++) {
+				kbd.r[kbd.wi++] = kbuf[i];
+			}
+			if(kbd.wi == nelem(kbd.r))
+				kbd.wi = 0;
+			if(kbd.ri == kbd.wi)
+				kbd.stall = 1;
+			matchkbd();
+			free(kbuf);
+			break;
+		case XLookupKeySym:	
+			if(k == XK_F11){
+				fullscreen = !fullscreen;
+				_xmovewindow(fullscreen ? screenrect : windowrect);
+				return;
+			}		/* fall through */
+		case XLookupBoth:
+			c = ke->state;
+			switch(k) {
+			case XK_Alt_L:
+			case XK_Meta_L:	/* Shift Alt on PCs */
+			case XK_Alt_R:
+			case XK_Meta_R:	/* Shift Alt on PCs */
+			case XK_Multi_key:
+				if(xev->type == KeyPress)
+					altdown = 1;
+				else if(altdown) {
+					altdown = 0;
+					sendalt();
+				}
+				break;
+			}
+
+			switch(k) {
+			case XK_Control_L:
+				if(xev->type == KeyPress)
+					c |= ControlMask;
+				else
+					c &= ~ControlMask;
+				goto kbutton;
+			case XK_Alt_L:
+			case XK_Shift_L:
+				if(xev->type == KeyPress)
+					c |= Mod1Mask;
+				else
+					c &= ~Mod1Mask;
+			kbutton:
+				kstate = c;
+				if(m.buttons || kbuttons) {
+					altdown = 0; // used alt
+					kbuttons = 0;
+					if(c & ControlMask)
+						kbuttons |= 2;
+					if(c & Mod1Mask)
+						kbuttons |= 4;
+					sendmouse(m);
+					break;
+				}
+			}
+			if(kbd.stall)
+				return;
+			if((c = _xtoplan9kbd(xev)) < 0)
+				return;
+			kbd.r[kbd.wi++] = c;
+			if(kbd.wi == nelem(kbd.r))
+				kbd.wi = 0;
+			if(kbd.ri == kbd.wi)
+				kbd.stall = 1;
+			matchkbd();
+			break;
 		}
-		if(kbd.stall)
-			return;
-		if((c = _xtoplan9kbd(xev)) < 0)
-			return;
-		kbd.r[kbd.wi++] = c;
-		if(kbd.wi == nelem(kbd.r))
-			kbd.wi = 0;
-		if(kbd.ri == kbd.wi)
-			kbd.stall = 1;
-		matchkbd();
 		break;
 	
 	case FocusOut:
