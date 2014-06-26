@@ -508,7 +508,7 @@ runxevent(XEvent *xev)
 	XButtonEvent *be;
 	XKeyEvent *ke;
 	int kbuf_len = 10;
-	wchar_t *kbuf = (wchar_t *) malloc(kbuf_len * sizeof(wchar_t));
+	wchar_t *kbuf;
 	int klen;
 	Status status;
 
@@ -572,12 +572,12 @@ runxevent(XEvent *xev)
 		ke = (XKeyEvent*)xev;
 		if(xev->type != KeyPress)
 			break;
+	       	kbuf = (wchar_t *) malloc(kbuf_len * sizeof(wchar_t));
 		klen = XwcLookupString(_x.xic, ke, kbuf, kbuf_len, &k, &status);
 		/*fprintf(stderr, "klen:%d\t kbuf:%ls\t keysym:%04x\t status:%4x\t\n", klen, kbuf, k, status); */
 		if (status == XBufferOverflow) {
 			kbuf_len = klen;
-			kbuf = (wchar_t *)realloc((char *)kbuf,
-					kbuf_len * sizeof(wchar_t));
+			kbuf = (wchar_t *)realloc((char *)kbuf,kbuf_len * sizeof(wchar_t));
 			klen = XwcLookupString(_x.xic, ke, kbuf, kbuf_len, &k, &status);
 		} 
 
@@ -657,6 +657,7 @@ runxevent(XEvent *xev)
 			if(kbd.ri == kbd.wi)
 				kbd.stall = 1;
 			matchkbd();
+			free(kbuf);
 			break;
 		}
 		break;
