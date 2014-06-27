@@ -242,14 +242,6 @@ main(int argc, char **argv)
 		}
 		{
 			/*
-			 * Setup Input Method
-			 */	
-			/* _x.xim = XOpenIM(_x.display, NULL, NULL, NULL);
-			_x.xic = XCreateIC(_x.xim, XNInputStyle, XIMPreeditNothing | XIMStatusNothing, XNClientWindow, _x.drawable, NULL);
-			XGetICValues(_x.xic, XNFilterEvents, &(_x.xim_event_mask), NULL);
-			XSetICFocus(_x.xic);
-*/	
-			/*
 			 * Read an X message if we can.
 			 * (XPending actually calls select to make sure
 			 * the display's fd is readable and then reads
@@ -670,8 +662,12 @@ runxevent(XEvent *xev)
 		 */
 		kstate = 0;
 		abortcompose();
+		/* Restore XIC */
+		_x.xic = XCreateIC(_x.xim, XNInputStyle, XIMPreeditNothing | XIMStatusNothing, XNClientWindow, _x.drawable, NULL);
+		XGetICValues(_x.xic, XNFilterEvents, &(_x.xim_event_mask), NULL);
+		XSetICFocus(_x.xic);
 		break;
-	
+
 	case SelectionRequest:
 		_xselect(xev);
 		break;
