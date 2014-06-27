@@ -68,6 +68,7 @@ struct Xprivate {
 	Atom		takefocus;
 	Atom		losefocus;
 	Atom		wmprotos;
+	Atom		wmdelwindow;
 	uint		putsnarf;
 	uint		assertsnarf;
 	int		destroyed;

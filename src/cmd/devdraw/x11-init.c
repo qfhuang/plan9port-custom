@@ -359,6 +359,9 @@ _xattach(char *label, char *winsize)
 	_x.losefocus = XInternAtom(_x.display, "_9WM_LOSE_FOCUS", False);
 	_x.wmprotos = XInternAtom(_x.display, "WM_PROTOCOLS", False);
 
+	_x.wmdelwindow = XInternAtom(_x.display, "WM_DELETE_WINDOW", False);
+	XSetWMProtocols(_x.display, _x.drawable, &_x.wmdelwindow, 1);
+
 	atoms[0] = _x.takefocus;
 	atoms[1] = _x.losefocus;
 	XChangeProperty(_x.display, _x.drawable, _x.wmprotos, XA_ATOM, 32,

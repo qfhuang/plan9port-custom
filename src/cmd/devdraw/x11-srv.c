@@ -653,7 +653,11 @@ runxevent(XEvent *xev)
 			break;
 		}
 		break;
-	
+
+	case FocusIn:
+		XSetICFocus(_x.xic);
+		break;
+
 	case FocusOut:
 		/*
 		 * Some key combinations (e.g. Alt-Tab) can cause us
@@ -662,15 +666,21 @@ runxevent(XEvent *xev)
 		 */
 		kstate = 0;
 		abortcompose();
-		/* Restore XIC */
-		_x.xic = XCreateIC(_x.xim, XNInputStyle, XIMPreeditNothing | XIMStatusNothing, XNClientWindow, _x.drawable, NULL);
-		XGetICValues(_x.xic, XNFilterEvents, &(_x.xim_event_mask), NULL);
-		XSetICFocus(_x.xic);
+		XUnsetICFocus(_x.xic);
 		break;
 
 	case SelectionRequest:
 		_xselect(xev);
 		break;
+
+	case ClientMessage:
+		if(xev->xclient.data.l[0] == _x.wmdelwindow)
+		{
+			XDestroyWindow(_x.display, _x.drawable);
+			XCloseIM(_x.xim);
+		}
+		break;
+
 	}
 }
 
